@@ -7,7 +7,8 @@
             [cljs-repl-web.subs]
             [cljs-repl-web.views :as views]
             [cljs-repl-web.replumb-proxy :as replumb-proxy]
-            [cljs-repl-web.config :as config]))
+            [cljs-repl-web.config :as config]
+            [re-complete.core :as re-complete]))
 
 (defonce console-key :cljs-console)
 

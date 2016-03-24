@@ -14,7 +14,8 @@
             [cljs-api.utils :as api-utils]
             [cljs-repl-web.views.utils :as utils]
             [cljs-repl-web.markdown :as md]
-            [cljs-repl-web.code-mirror.core :as cm]))
+            [cljs-repl-web.code-mirror.core :as cm]
+            [re-complete.core :as re-complete]))
 
 ;; (set! re-com.box/debug true)
 
@@ -321,15 +322,15 @@
              examples-strings :examples-strings
              sign :signature
              related :related} sym-doc-map
-             desc (or desc docstring) ; some symbols don't have a description so we use
+            desc (or desc docstring) ; some symbols don't have a description so we use
                                         ; the docstring instead; docstring is a regular string,
                                         ; without markdown. Nonetheless, it will be passed to
                                         ; md->react->component function to gain some basic html
                                         ; formatting (like paragraphs)
-             examples (map (fn [html string] {:html html :strings string}) examples-htmls examples-strings)
-             popover-width  (if (= :narrow @media-query) 280 400)
-             popover-height (if (= :narrow @media-query) 250 400)
-             popover-content-width (- popover-width (* 2 14) 15)] ; bootstrap padding + scrollbar width
+            examples (map (fn [html string] {:html html :strings string}) examples-htmls examples-strings)
+            popover-width  (if (= :narrow @media-query) 280 400)
+            popover-height (if (= :narrow @media-query) 250 400)
+            popover-content-width (- popover-width (* 2 14) 15)] ; bootstrap padding + scrollbar width
         [popover-content-wrapper
          :showing? showing-atom
          :position @position-atom
@@ -377,31 +378,31 @@
   (let [showing? (reagent/atom false)
         popover-position (reagent/atom :below-center)]
     (fn api-symbol-form2 [symbol]
-     [box
-      :size "0 1 auto"
-      :align :center
-      :class "api-panel-symbol-label-box"
-      :child (if-let [symbol (get-symbol-doc-map (str symbol))]
-               [popover-anchor-wrapper
-                :showing? showing?
-                :position @popover-position
-                :anchor [button
-                         :class "btn btn-default api-panel-symbol-button"
-                         :label (:name symbol)
-                         ;; we use :attr's `:on-click` because button's `on-click` accepts
-                         ;; a parametless function and we need the mouse click coordinates
-                         :attr { :on-click
-                                (handler-fn
-                                 ;; later we can refactor it into re-frame
-                                 ;; see also https://github.com/Day8/re-frame/wiki/Beware-Returning-False#user-content-usage-examples
-                                 (reset! popover-position
-                                         (utils/calculate-popover-position [(.-clientX event) (.-clientY event)]))
-                                 (reset! showing? true))}]
-                :popover [symbol-popover showing? popover-position symbol]]
-               [label
-                :label (str symbol)
-                :class "api-panel-symbol-label"
-                :style (flex-child-style "80 1 auto")])])))
+      [box
+       :size "0 1 auto"
+       :align :center
+       :class "api-panel-symbol-label-box"
+       :child (if-let [symbol (get-symbol-doc-map (str symbol))]
+                [popover-anchor-wrapper
+                 :showing? showing?
+                 :position @popover-position
+                 :anchor [button
+                          :class "btn btn-default api-panel-symbol-button"
+                          :label (:name symbol)
+                          ;; we use :attr's `:on-click` because button's `on-click` accepts
+                          ;; a parametless function and we need the mouse click coordinates
+                          :attr { :on-click
+                                 (handler-fn
+                                  ;; later we can refactor it into re-frame
+                                  ;; see also https://github.com/Day8/re-frame/wiki/Beware-Returning-False#user-content-usage-examples
+                                  (reset! popover-position
+                                          (utils/calculate-popover-position [(.-clientX event) (.-clientY event)]))
+                                  (reset! showing? true))}]
+                 :popover [symbol-popover showing? popover-position symbol]]
+                [label
+                 :label (str symbol)
+                 :class "api-panel-symbol-label"
+                 :style (flex-child-style "80 1 auto")])])))
 
 (defn section-title-component
   [section-title]
@@ -544,12 +545,14 @@
 
 (defn repl-component [console-key eval-opts]
   (let [media-query (subscribe [:media-query-size])]
+    (dispatch [:options console-key {:trim-chars "[]()"}])
     (fn repl-component-form2 []
       (let [children [[cljs-buttons]
                       [box
                        :size "0 0 auto"
                        :class "cm-console-container"
-                       :child [cm/console console-key eval-opts]]]]
+                       :child [cm/console console-key eval-opts]]
+                      [re-complete/completions console-key #(dispatch [:console-set-autocompleted-text console-key])]]]
         (if (= :narrow @media-query)
           [v-box
            :size "1 1 auto"

@@ -61,6 +61,11 @@
    (app/set-console-text db console-key text)))
 
 (register-handler
+ :console-set-autocompleted-text
+ (fn console-set-text [db [_ console-key]]
+   (app/set-console-text db console-key (get-in db [:autocomplete :linked-components (keyword console-key) :text]))))
+
+(register-handler
  :console-go-up
  (fn console-go-up [db [_ console-key]]
    (app/console-go-up db console-key)))

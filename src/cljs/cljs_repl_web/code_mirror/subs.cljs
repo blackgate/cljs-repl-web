@@ -29,6 +29,15 @@
                  (get items pos))))))
 
 (register-sub
+ :get-completed-input
+ (fn [db [_ console-key]]
+   (let [idx (reaction (get-in @db [:consoles (name console-key) :hist-pos]))
+         history (reaction (get-in @db [:consoles (name console-key) :history]))]
+     (reaction (let [items @history
+                     pos (- (count items) @idx 1)]
+                 (get items pos))))))
+
+(register-sub
  :get-console
  (fn [db [_ console-key]]
    (reaction (app/console @db console-key))))
@@ -37,6 +46,11 @@
  :queued-forms-empty?
  (fn [db [_ console-key]]
    (reaction (not (empty? (app/queued-forms @db console-key))))))
+
+(register-sub
+ :get-options
+ (fn [db [_ console-key]]
+   (reaction (get-in @db [:autocomplete :linked-components console-key :options]))))
 
 
 ;; )
