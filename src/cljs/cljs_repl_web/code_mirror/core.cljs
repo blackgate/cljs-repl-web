@@ -8,7 +8,8 @@
             [cljs-repl-web.code-mirror.common :as common]
             [cljs-repl-web.code-mirror.utils :as utils]
             [replumb.core :as replumb]
-            [re-complete.utils :as complete-utils]))
+            [re-complete.utils :as complete-utils]
+            [re-complete.app :as complete-app]))
 
 ;;; many parts are taken from jaredly's reepl
 ;;; https://github.com/jaredly/reepl
@@ -47,37 +48,43 @@
   (into [:div] (map (partial display-repl-item console-key) items)))
 
 (defn opening-excluded-chars [word excluded-chars]
-  (let [contains-word-chars? (map #(= (first word) %) excluded-chars)]
-    (if ((set contains-word-chars?) true)
-      (opening-excluded-chars (apply str (rest word)))
-      word)))
+  (if ((set (map #(= (first word) %) excluded-chars)) true)
+    (opening-excluded-chars (apply str (rest word)) excluded-chars)
+    word))
 
 (defn closing-excluded-chars [word excluded-chars]
-  (let [contains-word-chars? (map #(= (last word) %) excluded-chars)]
-    (if ((set contains-word-chars?) true)
-      (closing-excluded-chars (apply str (butlast word)))
-      word)))
+  (if ((set (map #(= (last word) %) excluded-chars)) true)
+    (closing-excluded-chars (apply str (butlast word)) excluded-chars)
+    word))
 
 (defn read-apropos [text excluded-chars]
-  (let [new-text (-> (opening-excluded-chars text excluded-chars)
+  (let [new-text (-> text
+                     (opening-excluded-chars excluded-chars)
                      (closing-excluded-chars excluded-chars))]
+    (.log js/console (str "new-text: " new-text))
     (if (= new-text "")
       ""
       (replumb/read-eval-call
-       (fn [result] (when (:success? result)
-                      (->> result
-                           :value
-                           cljs.reader/read-string
-                           (map str))))
+       (fn [result]
+         (when (:success? result)
+           (->> result
+                :value
+                cljs.reader/read-string
+                (map str))))
        (str "(apropos \"" new-text "\")")))))
 
-(defn my-aprop [text excluded-chars libs]
-  (map (fn [prop-item]
-         (let [split-prop-item (clojure.string/split prop-item #"/")]
-           (when ((set libs) (first split-prop-item))
-             (second split-prop-item))))
-       (read-apropos text excluded-chars)))
+(defn create-aprop [excluded-chars libs text]
+  (remove nil?
+          (map (fn [prop-item]
+                 (let [split-prop-item (clojure.string/split prop-item #"/")]
+                   (when ((set libs) (first split-prop-item))
+                     (second split-prop-item))))
+               (read-apropos text excluded-chars))))
 
+(defn current-word [previous-input input]
+  (->> input
+       (complete-app/index previous-input)
+       (complete-app/current-word input)))
 
 (defn console [console-key eval-opts]
   (let [{:keys [add-input
@@ -93,8 +100,8 @@
                 evaluate]} eval-opts
 
         items (subscribe [:get-console-items console-key])
-        text  (subscribe [:get-console-current-text console-key])
-        ;;text  (subscribe [:get-previous-input console-key])
+        previous-input  (subscribe [:get-console-current-text console-key])
+        text  (subscribe [:get-previous-input console-key])
         new-input (subscribe [:get-previous-input console-key])
         options (subscribe [:get-options console-key])
         submit (fn [source]
@@ -113,7 +120,7 @@
            {:on-up go-up
             :on-down go-down
             :on-change #(do (set-text %)
-                            (dispatch [:dictionary console-key (remove nil? (my-aprop % (:trim-chars @options) '("cljs.core")))])
+                            (dispatch [:dictionary console-key (create-aprop (:trim-chars @options) '("cljs.core") (current-word @previous-input %))])
                             (dispatch [:input console-key %]))
             :on-eval submit
             :get-prompt get-prompt
