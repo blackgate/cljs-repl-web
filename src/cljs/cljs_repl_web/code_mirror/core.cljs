@@ -61,7 +61,6 @@
   (let [new-text (-> text
                      (opening-excluded-chars excluded-chars)
                      (closing-excluded-chars excluded-chars))]
-    (.log js/console (str "new-text: " new-text))
     (if (= new-text "")
       ""
       (replumb/read-eval-call
@@ -73,7 +72,7 @@
                 (map str))))
        (str "(apropos \"" new-text "\")")))))
 
-(defn create-aprop [excluded-chars libs text]
+(defn create-dictionary [excluded-chars libs text]
   (remove nil?
           (map (fn [prop-item]
                  (let [split-prop-item (clojure.string/split prop-item #"/")]
@@ -100,8 +99,7 @@
                 evaluate]} eval-opts
 
         items (subscribe [:get-console-items console-key])
-        previous-input  (subscribe [:get-console-current-text console-key])
-        text  (subscribe [:get-previous-input console-key])
+        text  (subscribe [:get-console-current-text console-key])
         new-input (subscribe [:get-previous-input console-key])
         options (subscribe [:get-options console-key])
         submit (fn [source]
@@ -119,9 +117,9 @@
            editor/default-cm-opts
            {:on-up go-up
             :on-down go-down
-            :on-change #(do (set-text %)
-                            (dispatch [:dictionary console-key (create-aprop (:trim-chars @options) '("cljs.core") (current-word @previous-input %))])
-                            (dispatch [:input console-key %]))
+            :on-change #(do (dispatch [:dictionary console-key (create-dictionary (:trim-chars @options) '("cljs.core") (current-word @text %))])
+                            (dispatch [:input console-key %])
+                            (set-text %))
             :on-eval submit
             :get-prompt get-prompt
             :should-eval should-eval})]])
