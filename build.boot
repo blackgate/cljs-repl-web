@@ -22,7 +22,7 @@
                  [re-frame                    "0.5.0"]
                  [replumb/replumb             "0.2.2-SNAPSHOT"]
                  [cljsjs/highlight            "8.4-0"]
-                 [re-console                  "0.1.0-4"]
+                 [re-console                  "0.1.1"]
                  [re-com                      "0.7.0-alpha2"]
                  [cljs-ajax                   "0.5.1"]
                  [hickory                     "0.5.4"]
@@ -61,8 +61,13 @@
 ;;;    Options     ;;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
+(def foreign-libs
+  [{:file "resources/public/js/clojure-parinfer.js"
+    :provides ["parinfer.codemirror.mode.clojure.clojure-parinfer"]}])
+
 (def dev-compiler-options
-  {:source-map-timestamp true})
+  {:source-map-timestamp true
+   :foreign-libs foreign-libs})
 
 (def prod-compiler-options
   {:closure-defines {"goog.DEBUG" false}
@@ -70,7 +75,8 @@
    :static-fns true
    :elide-asserts true
    :pretty-print false
-   :source-map-timestamp true})
+   :source-map-timestamp true
+   :foreign-libs foreign-libs})
 
 (defmulti options
   "Return the correct option map for the build, dispatching on identity"
