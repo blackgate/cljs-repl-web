@@ -34,7 +34,7 @@
                  [binaryage/devtools          "0.5.2"]
                  [day8/re-frame-tracer        "0.1.0-SNAPSHOT"]
                  [cljsjs/codemirror           "5.10.0-0"]
-                 [re-complete                 "0.1.2-1-SNAPSHOT"]])
+                 [re-complete                 "0.1.3-1-SNAPSHOT"]])
 
 (def generator-deps '[[org.clojure/clojure         "1.7.0"]
                       [org.clojure/tools.reader    "1.0.0-alpha3"]
