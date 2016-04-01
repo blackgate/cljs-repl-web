@@ -7,9 +7,9 @@
             [cljs-repl-web.code-mirror.editor :as editor]
             [cljs-repl-web.code-mirror.common :as common]
             [cljs-repl-web.code-mirror.utils :as utils]
-            [replumb.core :as replumb]
+            [cljs-repl-web.code-mirror.app :as app]
             [re-complete.utils :as complete-utils]
-            [re-complete.app :as complete-app]))
+            [replumb.core :as replumb]))
 
 ;;; many parts are taken from jaredly's reepl
 ;;; https://github.com/jaredly/reepl
@@ -21,7 +21,8 @@
    :go-down      #(dispatch [:console-go-down console-key %])
    :clear-items  #(dispatch [:clear-console-items console-key %])
    :set-text     #(dispatch [:console-set-text console-key %])
-   :add-log      #(dispatch [:add-console-log console-key %])})
+   :add-log      #(dispatch [:add-console-log console-key %])
+   :complete-input #(dispatch [:input console-key %])})
 
 (defn display-output-item
   ([console-key value]
@@ -47,43 +48,22 @@
 (defn repl-items [console-key items]
   (into [:div] (map (partial display-repl-item console-key) items)))
 
-(defn opening-excluded-chars [word excluded-chars]
-  (if ((set (map #(= (first word) %) excluded-chars)) true)
-    (opening-excluded-chars (apply str (rest word)) excluded-chars)
-    word))
-
-(defn closing-excluded-chars [word excluded-chars]
-  (if ((set (map #(= (last word) %) excluded-chars)) true)
-    (closing-excluded-chars (apply str (butlast word)) excluded-chars)
-    word))
-
-(defn read-apropos [text excluded-chars]
+(defn read-apropos [text excluded-chars libs console-key]
   (let [new-text (-> text
-                     (opening-excluded-chars excluded-chars)
-                     (closing-excluded-chars excluded-chars))]
+                     (app/opening-excluded-chars excluded-chars)
+                     (app/closing-excluded-chars excluded-chars))]
     (if (= new-text "")
       ""
       (replumb/read-eval-call
        (fn [result]
          (when (:success? result)
-           (->> result
-                :value
-                cljs.reader/read-string
-                (map str))))
+           (dispatch [:dictionary console-key
+                      (->> result
+                           :value
+                           cljs.reader/read-string
+                           (map str)
+                           (app/create-dictionary libs))])))
        (str "(apropos \"" new-text "\")")))))
-
-(defn create-dictionary [excluded-chars libs text]
-  (remove nil?
-          (map (fn [prop-item]
-                 (let [split-prop-item (clojure.string/split prop-item #"/")]
-                   (when ((set libs) (first split-prop-item))
-                     (second split-prop-item))))
-               (read-apropos text excluded-chars))))
-
-(defn current-word [previous-input input]
-  (->> input
-       (complete-app/index previous-input)
-       (complete-app/current-word input)))
 
 (defn console [console-key eval-opts]
   (let [{:keys [add-input
@@ -92,7 +72,9 @@
                 go-down
                 clear-items
                 set-text
-                add-log]} (make-handlers console-key)
+                add-log
+                dictionary
+                complete-input]} (make-handlers console-key)
 
         {:keys [get-prompt
                 should-eval
@@ -100,7 +82,7 @@
 
         items (subscribe [:get-console-items console-key])
         text  (subscribe [:get-console-current-text console-key])
-        new-input (subscribe [:get-previous-input console-key])
+        previous-input (subscribe [:get-previous-input console-key])
         options (subscribe [:get-options console-key])
         submit (fn [source]
                  (evaluate #(dispatch [:on-eval-complete console-key %])
@@ -117,8 +99,8 @@
            editor/default-cm-opts
            {:on-up go-up
             :on-down go-down
-            :on-change #(do (dispatch [:dictionary console-key (create-dictionary (:trim-chars @options) '("cljs.core") (current-word @text %))])
-                            (dispatch [:input console-key %])
+            :on-change #(do ;;(read-apropos (app/current-word @previous-input %) (:trim-chars @options) '("cljs.core") console-key)
+                            (complete-input %)
                             (set-text %))
             :on-eval submit
             :get-prompt get-prompt

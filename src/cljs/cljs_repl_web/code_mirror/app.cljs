@@ -1,4 +1,5 @@
-(ns cljs-repl-web.code-mirror.app)
+(ns cljs-repl-web.code-mirror.app
+  (:require [re-complete.app :as complete-app]))
 
 (def initial-console-state {:items []
                             :hist-pos 0
@@ -125,8 +126,8 @@
   [db k]
   (update-in db [:consoles (name k) :hist-pos]
              (fn [pos] (if (<= pos 0)
-                        0
-                        (dec pos)))))
+                         0
+                         (dec pos)))))
 
 (defn clear-console-queued-forms
   [db k]
@@ -145,15 +146,43 @@
 (defn set-next-queued-form-if-any
   [db k]
   (if-let [form (first (queued-forms db k))]
-       (-> db
-           (set-console-text k form)
-           (drop-first-queued-form k))
-       db))
+    (-> db
+        (set-console-text k form)
+        (drop-first-queued-form k))
+    db))
 
 (defn on-eval-complete
   [db k {:keys [prev-ns source success? result]}]
   (-> db
-       (set-console-text k source)
-       (add-console-input k source prev-ns)
-       (add-console-result k (not success?) result)
-       (set-next-queued-form-if-any k)))
+      (set-console-text k source)
+      (add-console-input k source prev-ns)
+      (add-console-result k (not success?) result)
+      (set-next-queued-form-if-any k)))
+
+;;;;;;;;;;;;;;;;;;;;;
+;;  Autocomplete  ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+
+(defn opening-excluded-chars [word excluded-chars]
+  (if ((set (map #(= (first word) %) excluded-chars)) true)
+    (opening-excluded-chars (apply str (rest word)) excluded-chars)
+    word))
+
+(defn closing-excluded-chars [word excluded-chars]
+  (if ((set (map #(= (last word) %) excluded-chars)) true)
+    (closing-excluded-chars (apply str (butlast word)) excluded-chars)
+    word))
+
+(defn create-dictionary [libs aprop]
+  (remove nil?
+          (map (fn [prop-item]
+                 (let [split-prop-item (clojure.string/split prop-item #"/")]
+                   (when ((set libs) (first split-prop-item))
+                     (second split-prop-item))))
+               aprop)))
+
+(defn current-word [previous-input input]
+  (->> input
+       (complete-app/index previous-input)
+       (complete-app/current-word input)))
