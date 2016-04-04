@@ -9,7 +9,7 @@
 
   Read the docs at https://github.com/ScalaConsultants/replumb"
   [verbose? src-paths]
-  (merge (replumb/browser-options src-paths io/fetch-file!)
+  (merge (replumb/options :browser src-paths io/fetch-file!)
          {:warning-as-error true
           :verbose verbose?}))
 

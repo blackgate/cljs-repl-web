@@ -8,8 +8,10 @@
             [cljs-repl-web.code-mirror.common :as common]
             [cljs-repl-web.code-mirror.utils :as utils]
             [cljs-repl-web.code-mirror.app :as app]
+            [cljs-repl-web.replumb-proxy :as replumb-proxy]
             [re-complete.utils :as complete-utils]
-            [replumb.core :as replumb]))
+            [replumb.core :as replumb]
+            [cljs-repl-web.config :as config]))
 
 ;;; many parts are taken from jaredly's reepl
 ;;; https://github.com/jaredly/reepl
@@ -52,9 +54,11 @@
   (let [new-text (-> text
                      (app/opening-excluded-chars excluded-chars)
                      (app/closing-excluded-chars excluded-chars))]
+    (.log js/console new-text)
     (if (= new-text "")
       ""
       (replumb/read-eval-call
+       (replumb-proxy/repl-options (:verbose-repl? config/defaults) (:src-paths config/defaults))
        (fn [result]
          (when (:success? result)
            (dispatch [:dictionary console-key
@@ -73,7 +77,6 @@
                 clear-items
                 set-text
                 add-log
-                dictionary
                 complete-input]} (make-handlers console-key)
 
         {:keys [get-prompt
@@ -99,7 +102,7 @@
            editor/default-cm-opts
            {:on-up go-up
             :on-down go-down
-            :on-change #(do ;;(read-apropos (app/current-word @previous-input %) (:trim-chars @options) '("cljs.core") console-key)
+            :on-change #(do (read-apropos (app/current-word @previous-input %) (:trim-chars @options) '("cljs.core") console-key)
                             (complete-input %)
                             (set-text %))
             :on-eval submit
