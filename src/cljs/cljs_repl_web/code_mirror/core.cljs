@@ -50,24 +50,26 @@
 (defn repl-items [console-key items]
   (into [:div] (map (partial display-repl-item console-key) items)))
 
-(defn read-apropos [text excluded-chars libs console-key]
+(defn create-dictionary [text excluded-chars libs console-key]
   (let [new-text (-> text
                      (app/opening-excluded-chars excluded-chars)
-                     (app/closing-excluded-chars excluded-chars))]
-    (.log js/console new-text)
+                     (app/closing-excluded-chars excluded-chars))
+        user-ns (map #(str "cljs.user/" %) (keys (replumb.ast/ns-publics @replumb.repl.st 'cljs.user)))]
     (if (= new-text "")
       ""
-      (replumb/read-eval-call
-       (replumb-proxy/repl-options (:verbose-repl? config/defaults) (:src-paths config/defaults))
-       (fn [result]
-         (when (:success? result)
-           (dispatch [:dictionary console-key
-                      (->> result
-                           :value
-                           cljs.reader/read-string
-                           (map str)
-                           (app/create-dictionary libs))])))
-       (str "(apropos \"" new-text "\")")))))
+      (apply conj
+             (replumb/read-eval-call
+              (replumb-proxy/repl-options (:verbose-repl? config/defaults) (:src-paths config/defaults))
+              (fn [result]
+                (when (:success? result)
+                  (dispatch [:dictionary console-key
+                             (->> result
+                                  :value
+                                  cljs.reader/read-string
+                                  (map str)
+                                  (app/create-dictionary libs))])))
+              (str "(apropos \"" new-text "\")"))
+             user-ns))))
 
 (defn console [console-key eval-opts]
   (let [{:keys [add-input
@@ -102,7 +104,7 @@
            editor/default-cm-opts
            {:on-up go-up
             :on-down go-down
-            :on-change #(do (read-apropos (app/current-word @previous-input %) (:trim-chars @options) '("cljs.core") console-key)
+            :on-change #(do (create-dictionary (app/current-word @previous-input %) (:trim-chars @options) '("cljs.core" "cljs.user") console-key)
                             (complete-input %)
                             (set-text %))
             :on-eval submit
